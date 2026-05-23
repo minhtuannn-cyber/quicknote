@@ -76,13 +76,6 @@
     // Load notes
     state.notes = await window.notesAPI.getNotes();
 
-    if (state.notes.length > 0) {
-      state.currentNoteId = state.notes[0].id;
-    }
-
-    render();
-    bindEvents();
-
     // Initialize Quill
     quill = new window.Quill('#noteEditor', {
       theme: 'snow',
@@ -98,6 +91,13 @@
     });
 
     quill.on('text-change', onEditorInput);
+
+    if (state.notes.length > 0) {
+      state.currentNoteId = state.notes[0].id;
+    }
+
+    render();
+    bindEvents();
 
     // Startup sync: pull from Notion (auto-restore if local is empty)
     startupSync();
