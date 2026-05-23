@@ -477,6 +477,14 @@
     elements.charCount.textContent = `${count} character${count !== 1 ? 's' : ''}`;
   }
 
+  // ─── Helpers ────────────────────────────────────────────────────────────────
+
+  function stripHtml(html) {
+    if (!html) return '';
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return doc.body.textContent || '';
+  }
+
   // ─── Rendering ──────────────────────────────────────────────────────────────
 
   function render() {
@@ -489,21 +497,24 @@
 
     // Filter by search
     if (state.searchQuery) {
-      notes = notes.filter(
-        (n) =>
+      notes = notes.filter((n) => {
+        const plainText = stripHtml(n.content).toLowerCase();
+        return (
           n.title.toLowerCase().includes(state.searchQuery) ||
-          n.content.toLowerCase().includes(state.searchQuery)
-      );
+          plainText.includes(state.searchQuery)
+        );
+      });
     }
 
     // Render list
     elements.notesList.innerHTML = notes
-      .map(
-        (note) => `
+      .map((note) => {
+        const plainText = stripHtml(note.content);
+        return `
         <div class="note-item ${note.id === state.currentNoteId ? 'active' : ''} ${note.pinned ? 'pinned' : ''}"
              data-id="${note.id}">
           <div class="note-item-title">${escapeHtml(note.title)}</div>
-          <div class="note-item-preview">${escapeHtml(note.content.substring(0, 80))}</div>
+          <div class="note-item-preview">${escapeHtml(plainText.substring(0, 80))}</div>
           <div class="note-item-date">${formatDate(note.updatedAt)}</div>
         </div>
       `
