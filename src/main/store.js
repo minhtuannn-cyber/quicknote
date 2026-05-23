@@ -10,6 +10,14 @@ const NOTES_FILE = path.join(DATA_DIR, 'notes.json');
 const SETTINGS_FILE = path.join(DATA_DIR, 'settings.json');
 const OFFLINE_QUEUE_FILE = path.join(DATA_DIR, 'offline-queue.json');
 
+const DEFAULT_SETTINGS = {
+  theme: 'dark',
+  alwaysOnTop: true,
+  windowBounds: { width: 380, height: 520 },
+  notionApiKey: '',
+  notionDatabaseId: '',
+};
+
 function ensureDataDir() {
   if (!fs.existsSync(DATA_DIR)) {
     fs.mkdirSync(DATA_DIR, { recursive: true });
@@ -38,6 +46,10 @@ function writeJSON(filePath, data) {
     console.error(`Error writing ${filePath}:`, e);
   }
 }
+
+// Initialize Notion config from settings on startup
+const initialSettings = readJSON(SETTINGS_FILE, DEFAULT_SETTINGS);
+notion.setConfig(initialSettings.notionApiKey || '', initialSettings.notionDatabaseId || '');
 
 // ─── ID Generator ───────────────────────────────────────────────────────────────
 
@@ -356,12 +368,6 @@ async function testNotionConnection() {
 
 // ─── Settings ───────────────────────────────────────────────────────────────────
 
-const DEFAULT_SETTINGS = {
-  theme: 'dark',
-  alwaysOnTop: true,
-  windowBounds: { width: 380, height: 520 },
-};
-
 function getSettings() {
   return readJSON(SETTINGS_FILE, DEFAULT_SETTINGS);
 }
@@ -370,6 +376,7 @@ function saveSettings(settings) {
   const current = getSettings();
   const merged = { ...current, ...settings };
   writeJSON(SETTINGS_FILE, merged);
+  notion.setConfig(merged.notionApiKey || '', merged.notionDatabaseId || '');
   return merged;
 }
 

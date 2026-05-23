@@ -25,6 +25,7 @@
   const elements = {
     // Title bar
     btnSync: $('btnSync'),
+    btnSettings: $('btnSettings'),
     btnToggleTheme: $('btnToggleTheme'),
     btnTogglePin: $('btnTogglePin'),
     btnMinimize: $('btnMinimize'),
@@ -50,6 +51,13 @@
 
     // Empty state
     emptyState: $('emptyState'),
+
+    // Settings Modal
+    settingsModal: $('settingsModal'),
+    btnCancelSettings: $('btnCancelSettings'),
+    btnSaveSettings: $('btnSaveSettings'),
+    inputNotionApiKey: $('inputNotionApiKey'),
+    inputNotionDatabaseId: $('inputNotionDatabaseId'),
   };
 
   // ─── Initialize ─────────────────────────────────────────────────────────────
@@ -110,23 +118,31 @@
   function bindEvents() {
     // Title bar buttons
     elements.btnSync.addEventListener('click', manualSync);
+    elements.btnSettings.addEventListener('click', openSettings);
     elements.btnToggleTheme.addEventListener('click', toggleTheme);
     elements.btnTogglePin.addEventListener('click', toggleAlwaysOnTop);
     elements.btnMinimize.addEventListener('click', () => window.notesAPI.minimizeWindow());
     elements.btnClose.addEventListener('click', () => window.notesAPI.hideWindow());
 
     // Sidebar
-    elements.searchInput.addEventListener('input', onSearchInput);
     elements.btnNewNote.addEventListener('click', createNewNote);
-    elements.btnToggleSidebar.addEventListener('click', toggleSidebar);
+    elements.searchInput.addEventListener('input', onSearchInput);
 
     // Editor
+    elements.btnToggleSidebar.addEventListener('click', toggleSidebar);
     elements.noteTitleInput.addEventListener('input', onTitleInput);
     elements.noteEditor.addEventListener('input', onEditorInput);
     elements.btnPinNote.addEventListener('click', pinCurrentNote);
     elements.btnDeleteNote.addEventListener('click', deleteCurrentNote);
 
-    // Keyboard shortcuts
+    // Settings Modal
+    elements.btnCancelSettings.addEventListener('click', closeSettings);
+    elements.btnSaveSettings.addEventListener('click', saveSettings);
+    elements.settingsModal.addEventListener('click', (e) => {
+      if (e.target === elements.settingsModal) closeSettings();
+    });
+
+    // Global
     document.addEventListener('keydown', onKeyDown);
   }
 
@@ -204,6 +220,49 @@
 
     elements.btnSync.classList.remove('spinning');
     setTimeout(() => setSaveStatus('', 'Ready'), 4000);
+  }
+
+  // ─── Settings Modal ───────────────────────────────────────────────────────
+
+  async function openSettings() {
+    const settings = await window.notesAPI.getSettings();
+    elements.inputNotionApiKey.value = settings.notionApiKey || '';
+    elements.inputNotionDatabaseId.value = settings.notionDatabaseId || '';
+    elements.settingsModal.classList.add('show');
+  }
+
+  function closeSettings() {
+    elements.settingsModal.classList.remove('show');
+  }
+
+  async function saveSettings() {
+    const apiKey = elements.inputNotionApiKey.value.trim();
+    const dbId = elements.inputNotionDatabaseId.value.trim();
+
+    elements.btnSaveSettings.textContent = 'Saving...';
+    elements.btnSaveSettings.disabled = true;
+
+    // Save
+    await window.notesAPI.saveSettings({
+      notionApiKey: apiKey,
+      notionDatabaseId: dbId
+    });
+
+    // Test connection
+    setSaveStatus('syncing', '☁ Testing connection...');
+    const result = await window.notesAPI.testNotionConnection();
+
+    if (result.success) {
+      setSaveStatus('synced', '☁ Connected to Notion!');
+      closeSettings();
+      setTimeout(() => manualSync(), 1000); // Trigger a sync
+    } else {
+      setSaveStatus('sync-error', '⚠ Notion error: ' + (result.error || 'Check credentials'));
+      alert('Failed to connect to Notion. Please check your API Key and Database ID.\n\nError: ' + result.error);
+    }
+
+    elements.btnSaveSettings.textContent = 'Save';
+    elements.btnSaveSettings.disabled = false;
   }
 
   // ─── Theme ──────────────────────────────────────────────────────────────────

@@ -8,14 +8,23 @@ const NOTION_VERSION = '2022-06-28';
 
 // ─── Configuration ──────────────────────────────────────────────────────────────
 
-const config = {
-  apiKey: 'ntn_241405714395K' + '0m3UsPAd9ymSLDDgp49qHu3wCAcgcw8qa',
-  databaseId: '36959ee3-e32f-80ca-ad9a-c8c6273d333f',
+let config = {
+  apiKey: '',
+  databaseId: '',
 };
+
+function setConfig(apiKey, databaseId) {
+  config.apiKey = apiKey;
+  config.databaseId = databaseId;
+}
 
 // ─── API Helper ─────────────────────────────────────────────────────────────────
 
 async function notionFetch(endpoint, method = 'GET', body = null) {
+  if (!config.apiKey) {
+    return { success: false, error: 'Notion API key not configured', data: null };
+  }
+
   const options = {
     method,
     headers: {
@@ -179,6 +188,10 @@ async function archiveNotionPage(notionPageId) {
 // ─── Pull ALL notes from Notion database ────────────────────────────────────────
 
 async function pullAllNotes() {
+  if (!config.apiKey || !config.databaseId) {
+    return { success: false, error: 'Notion not configured', notes: [] };
+  }
+
   console.log('[Notion] Pulling all notes from database...');
 
   const result = await notionFetch(`/databases/${config.databaseId}/query`, 'POST', {
@@ -310,6 +323,10 @@ async function deleteNotionNote(notionPageId) {
 // ─── Test connection ────────────────────────────────────────────────────────────
 
 async function testConnection() {
+  if (!config.apiKey || !config.databaseId) {
+    return { success: false, error: 'Notion not configured' };
+  }
+
   const result = await notionFetch(`/databases/${config.databaseId}`, 'GET');
 
   if (result.success) {
@@ -323,6 +340,8 @@ async function testConnection() {
 // ─── Check if online ────────────────────────────────────────────────────────────
 
 async function isOnline() {
+  if (!config.apiKey || !config.databaseId) return false;
+
   try {
     const result = await notionFetch(`/databases/${config.databaseId}`, 'GET');
     return result.success;
@@ -332,6 +351,7 @@ async function isOnline() {
 }
 
 module.exports = {
+  setConfig,
   syncNote,
   deleteNotionNote,
   pullAllNotes,
