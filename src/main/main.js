@@ -64,6 +64,11 @@ function createWindow() {
     mainWindow.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
   });
 
+  // Forward renderer console logs to main terminal
+  mainWindow.webContents.on('console-message', (event, level, message, line, sourceId) => {
+    console.log(`[Renderer] ${message} (${sourceId}:${line})`);
+  });
+
   // Save window position and size on move/resize
   mainWindow.on('moved', saveWindowBounds);
   mainWindow.on('resized', saveWindowBounds);

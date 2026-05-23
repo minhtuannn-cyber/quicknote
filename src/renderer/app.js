@@ -517,8 +517,8 @@
           <div class="note-item-preview">${escapeHtml(plainText.substring(0, 80))}</div>
           <div class="note-item-date">${formatDate(note.updatedAt)}</div>
         </div>
-      `
-      )
+      `;
+      })
       .join('');
 
     // Bind click events
