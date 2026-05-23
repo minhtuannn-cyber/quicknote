@@ -507,31 +507,69 @@ html, body {
   gap: 2px;
 }
 
-/* ─── Note Editor ────────────────────────────────────────────────────────────── */
-
-.note-editor {
+.editor-content {
   flex: 1;
-  padding: var(--space-lg);
-  border: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--bg-editor);
-  color: var(--text-primary);
+}
+
+#noteEditor {
+  flex: 1;
   font-family: var(--font-family);
   font-size: 13px;
   line-height: 1.7;
-  resize: none;
-  outline: none;
-  user-select: text;
-  transition: background var(--transition-normal);
+  color: var(--text-primary);
 }
 
-.note-editor::placeholder {
-  color: var(--text-placeholder);
+.ql-toolbar.ql-snow {
+  border: none !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  font-family: var(--font-family) !important;
+  padding: 8px var(--space-md) !important;
 }
 
-.note-editor:focus {
-  background: transparent;
+.ql-container.ql-snow {
+  border: none !important;
+  font-family: var(--font-family) !important;
+  font-size: 13px !important;
 }
 
+.ql-editor {
+  padding: var(--space-lg) !important;
+}
+
+.ql-snow .ql-stroke {
+  stroke: var(--text-secondary) !important;
+}
+
+.ql-snow .ql-fill, .ql-snow .ql-stroke.ql-fill {
+  fill: var(--text-secondary) !important;
+}
+
+.ql-snow .ql-picker {
+  color: var(--text-secondary) !important;
+}
+
+.ql-snow .ql-active .ql-stroke, 
+.ql-snow .ql-picker-label:hover .ql-stroke {
+  stroke: var(--accent) !important;
+}
+
+.ql-snow .ql-active .ql-fill,
+.ql-snow .ql-picker-label:hover .ql-fill {
+  fill: var(--accent) !important;
+}
+
+.ql-snow .ql-active {
+  color: var(--accent) !important;
+}
+
+.ql-editor.ql-blank::before {
+  color: var(--text-placeholder) !important;
+  font-style: normal !important;
+}
 /* ─── Editor Footer ──────────────────────────────────────────────────────────── */
 
 .editor-footer {

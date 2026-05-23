@@ -4,6 +4,11 @@
    ═══════════════════════════════════════════════════════════════════════════════ */
 
 const NOTION_API_BASE = 'https://api.notion.com/v1';
+const { net } = require('electron');
+const cheerio = require('cheerio');
+
+// ─── Constants ──────────────────────────────────────────────────────────────────
+
 const NOTION_VERSION = '2022-06-28';
 
 // ─── Configuration ──────────────────────────────────────────────────────────────
@@ -52,21 +57,6 @@ async function notionFetch(endpoint, method = 'GET', body = null) {
     console.error('[Notion] Network Error:', err.message);
     return { success: false, error: err.message, data: null };
   }
-}
-
-// ─── Split text into 2000-char chunks for Notion rich_text ──────────────────────
-
-function splitTextToChunks(text, maxLength = 2000) {
-  if (!text) return [{ type: 'text', text: { content: '' } }];
-
-  const chunks = [];
-  for (let i = 0; i < text.length; i += maxLength) {
-    chunks.push({
-      type: 'text',
-      text: { content: text.slice(i, i + maxLength) },
-    });
-  }
-  return chunks.length > 0 ? chunks : [{ type: 'text', text: { content: '' } }];
 }
 
 // ─── Create a note in Notion ────────────────────────────────────────────────────
@@ -149,26 +139,99 @@ async function replacePageContent(pageId, content) {
   }
 }
 
-// ─── Build Notion blocks from plain text content ────────────────────────────────
+// ─── Build Notion blocks from HTML content ────────────────────────────────────
 
-function buildContentBlocks(content) {
-  if (!content || !content.trim()) return [];
-
-  const lines = content.split('\n');
+function buildContentBlocks(htmlContent) {
+  if (!htmlContent) return [];
   const blocks = [];
+  const $ = cheerio.load(htmlContent);
 
-  for (const line of lines) {
-    blocks.push({
-      object: 'block',
-      type: 'paragraph',
-      paragraph: {
-        rich_text: splitTextToChunks(line),
-      },
-    });
+  $('body').children().each((_, el) => {
+    const tagName = el.tagName.toLowerCase();
+    
+    if (tagName === 'p') {
+      blocks.push({
+        object: 'block',
+        type: 'paragraph',
+        paragraph: { rich_text: parseRichText($, el) }
+      });
+    } else if (tagName === 'ol') {
+      $(el).children('li').each((_, li) => {
+        blocks.push({
+          object: 'block',
+          type: 'numbered_list_item',
+          numbered_list_item: { rich_text: parseRichText($, li) }
+        });
+      });
+    } else if (tagName === 'ul') {
+      $(el).children('li').each((_, li) => {
+        blocks.push({
+          object: 'block',
+          type: 'bulleted_list_item',
+          bulleted_list_item: { rich_text: parseRichText($, li) }
+        });
+      });
+    } else {
+      // Fallback for divs, headings, etc
+      blocks.push({
+        object: 'block',
+        type: 'paragraph',
+        paragraph: { rich_text: parseRichText($, el) }
+      });
+    }
+  });
+
+  return blocks.slice(0, 100);
+}
+
+function parseRichText($, parentEl) {
+  const richTexts = [];
+  
+  function walk(node, currentAnnotations) {
+    if (node.type === 'text') {
+      const text = node.data;
+      if (text) {
+        richTexts.push({
+          type: 'text',
+          text: { content: text },
+          annotations: { ...currentAnnotations }
+        });
+      }
+    } else if (node.type === 'tag') {
+      const tag = node.name.toLowerCase();
+      const newAnn = { ...currentAnnotations };
+      
+      if (tag === 'strong' || tag === 'b') newAnn.bold = true;
+      if (tag === 'em' || tag === 'i') newAnn.italic = true;
+      if (tag === 'u') newAnn.underline = true;
+      if (tag === 's' || tag === 'strike') newAnn.strikethrough = true;
+      
+      const bg = $(node).css('background-color');
+      if (bg === 'yellow' || bg === 'rgb(255, 255, 0)' || tag === 'mark') {
+        newAnn.color = 'yellow_background';
+      }
+
+      $(node).contents().each((_, child) => {
+        walk(child, newAnn);
+      });
+    }
   }
 
-  // Notion API limits to 100 blocks per request
-  return blocks.slice(0, 100);
+  $(parentEl).contents().each((_, child) => {
+    walk(child, {
+      bold: false,
+      italic: false,
+      strikethrough: false,
+      underline: false,
+      color: 'default'
+    });
+  });
+
+  if (richTexts.length === 0) {
+    richTexts.push({ type: 'text', text: { content: '' } });
+  }
+
+  return richTexts;
 }
 
 // ─── Archive (soft delete) a note in Notion ─────────────────────────────────────
@@ -265,7 +328,7 @@ async function parseNotionPage(page) {
   };
 }
 
-// ─── Get page content as plain text ─────────────────────────────────────────────
+// ─── Get page content as HTML ───────────────────────────────────────────────────
 
 async function getPageContent(pageId) {
   const result = await notionFetch(`/blocks/${pageId}/children?page_size=100`, 'GET');
@@ -274,24 +337,46 @@ async function getPageContent(pageId) {
     return '';
   }
 
-  const lines = [];
+  let html = '';
   for (const block of result.data.results) {
-    const text = extractBlockText(block);
-    lines.push(text);
+    html += convertBlockToHtml(block);
   }
 
-  return lines.join('\n');
+  return html;
 }
 
-// ─── Extract plain text from a Notion block ─────────────────────────────────────
+// ─── Convert Notion block to HTML ───────────────────────────────────────────────
 
-function extractBlockText(block) {
+function convertBlockToHtml(block) {
   const type = block.type;
   const data = block[type];
 
   if (!data || !data.rich_text) return '';
 
-  return data.rich_text.map((t) => t.plain_text || '').join('');
+  let textHtml = '';
+  for (const rt of data.rich_text) {
+    if (rt.type !== 'text') continue;
+    let text = rt.plain_text;
+    if (!text) continue;
+    
+    // Simple HTML escape
+    text = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    
+    const ann = rt.annotations;
+    if (ann.bold) text = `<strong>${text}</strong>`;
+    if (ann.italic) text = `<em>${text}</em>`;
+    if (ann.underline) text = `<u>${text}</u>`;
+    if (ann.strikethrough) text = `<s>${text}</s>`;
+    if (ann.color === 'yellow_background') text = `<span style="background-color: yellow;">${text}</span>`;
+    
+    textHtml += text;
+  }
+
+  if (type === 'paragraph') return `<p>${textHtml || '<br>'}</p>`;
+  if (type === 'bulleted_list_item') return `<ul><li>${textHtml}</li></ul>`;
+  if (type === 'numbered_list_item') return `<ol><li>${textHtml}</li></ol>`;
+  
+  return `<p>${textHtml}</p>`;
 }
 
 // ─── Sync a single note (push to Notion) ───────────────────────────────────────

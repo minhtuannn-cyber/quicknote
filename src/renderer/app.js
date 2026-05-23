@@ -60,6 +60,9 @@
     inputNotionDatabaseId: $('inputNotionDatabaseId'),
   };
 
+  // Quill Editor Instance
+  let quill;
+
   // ─── Initialize ─────────────────────────────────────────────────────────────
 
   async function init() {
@@ -79,6 +82,22 @@
 
     render();
     bindEvents();
+
+    // Initialize Quill
+    quill = new window.Quill('#noteEditor', {
+      theme: 'snow',
+      modules: {
+        toolbar: [
+          ['bold', 'italic', 'underline', 'strike'],
+          [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+          [{ 'background': ['yellow', false] }],
+          ['clean']
+        ]
+      },
+      placeholder: 'Start typing your note...'
+    });
+
+    quill.on('text-change', onEditorInput);
 
     // Startup sync: pull from Notion (auto-restore if local is empty)
     startupSync();
@@ -131,7 +150,6 @@
     // Editor
     elements.btnToggleSidebar.addEventListener('click', toggleSidebar);
     elements.noteTitleInput.addEventListener('input', onTitleInput);
-    elements.noteEditor.addEventListener('input', onEditorInput);
     elements.btnPinNote.addEventListener('click', pinCurrentNote);
     elements.btnDeleteNote.addEventListener('click', deleteCurrentNote);
 
@@ -407,7 +425,7 @@
       await window.notesAPI.saveNote({
         id: note.id,
         title: elements.noteTitleInput.value || 'Untitled',
-        content: elements.noteEditor.value,
+        content: quill.root.innerHTML,
       });
 
       // Refresh notes list
@@ -454,7 +472,8 @@
   }
 
   function updateCharCount() {
-    const count = elements.noteEditor.value.length;
+    const text = quill.getText();
+    const count = text.trim().length;
     elements.charCount.textContent = `${count} character${count !== 1 ? 's' : ''}`;
   }
 
@@ -517,7 +536,12 @@
     elements.emptyState.style.display = 'none';
 
     elements.noteTitleInput.value = note.title;
-    elements.noteEditor.value = note.content;
+    
+    // Disable text-change event while loading content programmatically
+    quill.off('text-change', onEditorInput);
+    quill.clipboard.dangerouslyPasteHTML(note.content || '');
+    quill.on('text-change', onEditorInput);
+    
     updateCharCount();
 
     // Update pin button state
