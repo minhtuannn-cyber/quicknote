@@ -1,0 +1,21 @@
+{
+  "name": "quicknote",
+  "version": "1.0.0",
+  "description": "QuickNote — Floating desktop note-taking app with global hotkey",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make"
+  },
+  "keywords": ["note", "desktop", "electron", "floating", "hotkey"],
+  "author": "QuickNote",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {
+    "@electron-forge/cli": "^7.6.0",
+    "@electron-forge/maker-dmg": "^7.6.0",
+    "@electron-forge/maker-zip": "^7.6.0",
+    "electron": "^33.0.0"
+  }
+}
